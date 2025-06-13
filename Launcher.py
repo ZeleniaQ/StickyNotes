@@ -1,15 +1,38 @@
 # Launcher.py
 import sys, os, random
-from PyQt5.QtWidgets import (
-    QApplication, QWidget, QHBoxLayout, QLabel
-)
+from PyQt5.QtWidgets import QApplication, QWidget, QHBoxLayout, QLabel, QMessageBox
 from PyQt5.QtCore import Qt, QRect, QEvent, QPoint
-from PyQt5.QtGui import (
-    QColor, QPainter, QPainterPath, QFontDatabase, QFont
-)
+from PyQt5.QtGui import QColor, QPainter, QPainterPath, QFontDatabase, QFont
 
 from StickyNotes import StickyNote
 from TodoList import TodoList
+
+if sys.platform.startswith("win") and getattr(sys, "frozen", False):
+    try:
+        import winreg
+        exe = sys.executable.replace("/", "\\")
+        # 1) .sn → StickyNotes.note
+        key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\Classes\.sn")
+        winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "StickyNotes.note")
+        key.Close()
+        # 2) 文件类型描述
+        key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\Classes\StickyNotes.note")
+        winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "Sticky Note File")
+        key.Close()
+        # 3) 默认图标
+        key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\Classes\StickyNotes.note\DefaultIcon")
+        winreg.SetValueEx(key, "", 0, winreg.REG_SZ, exe)
+        key.Close()
+        # 4) 打开命令
+        key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\Classes\StickyNotes.note\shell\open\command")
+        winreg.SetValueEx(
+            key, "", 0, winreg.REG_SZ,
+            f"\"{exe}\" \"%1\""
+        )
+        key.Close()
+    except Exception:
+        # 安全忽略任何注册失败
+        pass
 
 COLOR_SCHEMES = [
     ("#fffde7", "#fbc02d"),
@@ -22,22 +45,19 @@ COLOR_SCHEMES = [
 ]
 CAPSULE_RADIUS = 30
 CLICK_THRESHOLD = 5
+open_windows = []
 
 class Launcher(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowFlags(
-            Qt.FramelessWindowHint |
-            Qt.WindowStaysOnTopHint
-        )
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.resize(160, 60)
 
         self.left_color, _ = random.choice(COLOR_SCHEMES)
         self._dragging = False
-        self._press_pos = QPoint()
-        self._start_pos = QPoint()
-        self.open_windows = []
+        self._press = QPoint(); self._start = QPoint()
+        self.open_windows = []  # 引用窗口
 
         self.left_lbl = QLabel("便签", self)
         self.right_lbl = QLabel("待办", self)
@@ -111,7 +131,6 @@ class Launcher(QWidget):
         return super().eventFilter(o, ev)
 
 if __name__=="__main__":
-    # ———— 动态加载 SimHei.ttf ————
     app = QApplication(sys.argv)
     if getattr(sys, "frozen", False):
         base = sys._MEIPASS
@@ -133,7 +152,15 @@ if __name__=="__main__":
         }}
     """)
 
-    # ———— 启动 Launcher ————
-    launcher = Launcher()
-    launcher.show()
+    args = sys.argv[1:]
+    if args and args[0].lower().endswith(".sn"):
+        path = os.path.abspath(args[0].strip('"'))
+        win = StickyNote(path)
+        win.show(); win.raise_(); win.activateWindow()
+        open_windows.append(win)
+    else:
+        launcher = Launcher()
+        launcher.show()
+        open_windows.append(launcher)
+
     sys.exit(app.exec_())

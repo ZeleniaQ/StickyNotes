@@ -29,7 +29,7 @@ class TodoItem(QWidget):
                 font-family: "SVGASYS", "SimHei";
             }
         """)
-        chk.stateChanged.connect(lambda s: txt.font().setStrikeOut(s==Qt.Checked) or txt.setFont(txt.font()))
+        chk.stateChanged.connect(lambda state: self._toggle_strike(txt, state))
 
         row = QHBoxLayout()
         row.setContentsMargins(0,0,0,0)
@@ -47,6 +47,46 @@ class TodoItem(QWidget):
         sep.setFixedHeight(1)
         outer.addWidget(sep)
 
+    def _toggle_strike(self, line_edit, state):
+        font = line_edit.font()
+        font.setStrikeOut(state == Qt.Checked)
+        line_edit.setFont(font)
+
+
+class AddItemRow(QWidget):
+    def __init__(self, callback, btn_color="#444"):
+        super().__init__()
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 4, 0, 4)
+        outer.setSpacing(0)
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addStretch()
+
+        btn = QPushButton("+")
+        btn.setFixedSize(26, 26)
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                border: none;
+                font-size: 20px;
+                color: {btn_color};
+            }}
+            QPushButton:hover {{
+                color: white;
+                background-color: {btn_color};
+                border-radius: 13px;
+            }}
+        """)
+        btn.clicked.connect(callback)
+
+        layout.addWidget(btn)
+        layout.addStretch()
+
+        outer.addLayout(layout)
+
+
 class TodoList(QWidget):
     def __init__(self):
         super().__init__()
@@ -58,7 +98,6 @@ class TodoList(QWidget):
         self.old_pos=None; self.resizing_edge=None
         self.bg_color, self.btn_color = random.choice(COLOR_SCHEMES)
 
-        # 容器
         self.container = QWidget(self)
         self.container.setStyleSheet(f"""
             background-color:{self.bg_color};
@@ -68,7 +107,6 @@ class TodoList(QWidget):
         main.setContentsMargins(0,0,0,0)
         main.addWidget(self.container)
 
-        # 标题栏
         self.title_bar = QWidget(self.container)
         self.title_bar.setFixedHeight(30)
         self.title_bar.installEventFilter(self)
@@ -113,7 +151,6 @@ class TodoList(QWidget):
         tl.addWidget(self.title_edit); tl.addStretch()
         tl.addWidget(btn_min); tl.addWidget(btn_cl)
 
-        # 滚动区
         self.scroll = QScrollArea(self.container)
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QScrollArea.NoFrame)
@@ -137,11 +174,14 @@ class TodoList(QWidget):
         """)
 
         self.inner = QWidget()
-        lay = QVBoxLayout(self.inner)
-        lay.setContentsMargins(12,8,12,8)
-        lay.setSpacing(12)
-        for i in range(8):
-            lay.addWidget(TodoItem(show_placeholder=(i==0)))
+        self.todo_layout = QVBoxLayout(self.inner)
+        self.todo_layout.setContentsMargins(12,8,12,8)
+        self.todo_layout.setSpacing(12)
+
+        for i in range(7):
+            self.todo_layout.addWidget(TodoItem(show_placeholder=(i==0)))
+        self.add_item_row = AddItemRow(self.add_todo_item, self.btn_color)
+        self.todo_layout.addWidget(self.add_item_row)
 
         self.scroll.setWidget(self.inner)
 
@@ -150,6 +190,11 @@ class TodoList(QWidget):
         cl.addWidget(self.title_bar); cl.addWidget(self.scroll)
 
         self.show()
+
+    def add_todo_item(self):
+        item = TodoItem()
+        self.todo_layout.insertWidget(self.todo_layout.count() - 1, item)
+        item.findChild(QLineEdit).setFocus()
 
     def _adjust_color(self,c,f):
         col=QColor(c)
@@ -167,7 +212,6 @@ class TodoList(QWidget):
         self.setMask(self.round_mask(16))
 
     def eventFilter(self, s, e):
-        # 拖动标题栏
         if s is self.title_bar:
             if e.type()==QEvent.MouseButtonPress and e.button()==Qt.LeftButton:
                 self.old_pos = e.globalPos(); return True
@@ -204,7 +248,6 @@ class TodoList(QWidget):
 
     def mouseReleaseEvent(self, e):
         self.old_pos = None; self.resizing_edge = None
-        # 拖放结束更新遮罩
         self.setMask(self.round_mask(16))
         self.setCursor(Qt.ArrowCursor)
 

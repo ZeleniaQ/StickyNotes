@@ -5,7 +5,7 @@ a = Analysis(
     ['Launcher.py'],
     pathex=[],
     binaries=[],
-    datas=[('sticky_note_icon.ico', '.'), ('fonts/*.ttf', 'fonts'), ('fonts/*.fon', 'fonts')],
+    datas=[('fonts\\\\*.ttf', 'fonts'), ('fonts\\\\*.fon', 'fonts'), ('sticky_note_icon.ico', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
